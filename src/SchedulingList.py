@@ -28,6 +28,15 @@ class SchedulingList:
         '''
         return self.map.get(ts)
 
+    def Peek(self):
+        '''
+            Return the next (ts, event) tuple, or None if there are no scheduled events.
+        '''
+        if len(self.events) == 0:
+            return None
+        else:
+            return self.events[0]
+
     def Pop(self):
         '''
             Pops the next event (return it and stop tracking it).

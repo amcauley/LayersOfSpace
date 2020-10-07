@@ -4,6 +4,7 @@
 from collections import deque
 
 from src import Scheduler, SchedulingList
+from src.Log import Log
 
 class TestClass():
 
@@ -26,7 +27,7 @@ class TestClass():
 
         entriesSorted = sorted(entries)
         for entrySorted in entriesSorted:
-            print(entrySorted)
+            Log.debug(entrySorted)
             ts, event = entrySorted
             assert(sl.Get(ts) == event)
             assert(sl.Pop() == entrySorted)
@@ -49,7 +50,7 @@ class TestClass():
         # Note that the scheduler wraps entries in queues.
         entriesSorted = sorted(entries)
         for entrySorted in entriesSorted:
-            print(entrySorted)
+            Log.debug(entrySorted)
             ts, q = s.Pop()
             assert(ts == entrySorted[0])
             assert(q.pop() == entrySorted[1])

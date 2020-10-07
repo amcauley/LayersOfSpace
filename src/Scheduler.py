@@ -27,6 +27,12 @@ class Scheduler:
 
         e.appendleft(event)
 
+    def Peek(self):
+        '''
+            Return the next (ts, event) tuple, or None if there are no scheduled events.
+        '''
+        return self.schedule.Peek()
+
     def Pop(self):
         '''
             The events are returned as a tuple: (timestamp, event).

@@ -25,3 +25,6 @@ class Message:
 
     def setData(self, data):
         self.data = data
+
+    def __str__(self):
+        return f'<{self.type}: {self.data}>'

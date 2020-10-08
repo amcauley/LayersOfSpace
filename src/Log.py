@@ -23,4 +23,7 @@ class _Log:
     def info(self, s):
         return self.logger.info(s)
 
+    def warning(self, s):
+        return self.logger.warning(s)
+
 Log = _Log()

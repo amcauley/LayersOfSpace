@@ -8,9 +8,13 @@ from . import Message, Scheduler
 from .Log import Log
 
 class Layer:
-    def __init__(self, id):
+    def __init__(self):
         # Id holds the unique identifier string for this instance.
-        self.id = id
+        # By default it's None. It won't be assigned a value until this Item is registered to a parent.
+        # The idea is that until it's registered, a name is meaningless, and the parent (owner) should
+        # have rights to name its children in a way that makes sense for its purposes.
+        self.id = None
+        self.idCntr = 0
 
         # Tracks upcoming events that this layer needs to know about.
         self.scheduler = Scheduler.Scheduler()
@@ -23,6 +27,12 @@ class Layer:
 
         # Layers that list this one as a sub-layer.
         self.parents = []
+
+    def GetId(self):
+        return self.id
+
+    def SetId(self, id):
+        self.id = id
 
     def AddMessage(self, ts, message):
         '''
@@ -56,18 +66,50 @@ class Layer:
         '''
         return set(self.handlers.keys()).union(set(self.registrations.keys()))
 
+    def NewChildId(self):
+        '''
+            This function returns a new child ID based on sequential numbering.
+                It can be overridden if more complicated or descriptive naming schemes are desired.
+        '''
+        self.idCntr += 1
+        return f'{self.id}.{self.idCntr-1}'
+
+    def SetChildId(self, subLayer):
+        '''
+            Generate, apply, and return an ID for newly registering subLayer. 
+                If it already has an ID that doesn't conflict with other subLayers, just keep using it.
+                If an ID exists but conflicts, return None.
+        '''
+        childId = None
+        existingId = subLayer.GetId()
+
+        if existingId is None:
+            childId = self.NewChildId()
+            subLayer.SetId(childId)
+        elif existingId not in self.registrations.values():
+            childId = existingId
+
+        return childId
+
     def RegisterSubLayer(self, subLayer):
         '''
             (Re-)Register a sub-layer, i.e. identify which message types it will handle.
+                Return the name if the registered SubLayer.
+                Return None if registration failed.
         '''
-        Log.debug(f'Layer {self} registering subLayer {subLayer}')
+        id = self.SetChildId(subLayer)
+        if id is None:
+            Log.warning('Failed to register subLayer; ID creation failed')
+            return None
+
         types = self.GetMessageTypes()
         subTypes = subLayer.GetMessageTypes() 
 
-        for type in types:
-            if type not in self.registrations:
-                self.registrations[type] = []
-            self.registrations[type].append(subLayer)
+        for type in subTypes:
+            typeRegistrations = self.registrations.setdefault(type, [])
+            if subLayer not in typeRegistrations:
+                typeRegistrations.append(subLayer)
+                Log.debug(f'Layer {self} registered message type {type} due to subLayer {subLayer}')    
 
         newTypes = subTypes - types
 
@@ -77,6 +119,7 @@ class Layer:
                 parent.RegisterSubLayer(self)
 
         subLayer.AddParent(self)
+        return id
 
     def HandleMessage(self, message):
         '''

@@ -4,18 +4,13 @@
 from src import Layer, Message
 from src.Log import Log
 
-TEST_MESSAGE = Message.Message('TEST_MESSAGE_TYPE', 'TEST_DATA')
-
 class _TestLayerWithHandler(Layer.Layer):
     # Used for tracking the order in which test layer handlers are called.
     calls = []
 
     def __init__(self):
         super().__init__()
-
-        self.handlers = {
-            'TEST_MESSAGE_TYPE': self.TestMessageHandler,
-        }
+        self.handlers['TEST_MESSAGE_TYPE'] = self.TestMessageHandler
 
     def TestMessageHandler(self, message):
         if not self.parents:
@@ -28,12 +23,11 @@ class _TestLayerWithHandlerAndId(_TestLayerWithHandler):
     def __init__(self):
         super().__init__()
 
-        self.handlers = {
-            'TEST_MESSAGE_ALT_TYPE': self.TestMessageHandler,
-        }
+        del self.handlers['TEST_MESSAGE_TYPE']
+        self.handlers['TEST_MESSAGE_ALT_TYPE'] = self.TestMessageHandler
 
     def NewChildId(self):
-        return 'TestID'
+        return f'{self.id}.TestID'
 
 class TestClass():
 
@@ -66,9 +60,29 @@ class TestClass():
         TestClass.layerC.RegisterSubLayer(TestClass.layerX)
         TestClass.layerX.RegisterSubLayer(TestClass.layerY)
 
-        TestClass.layerA.Dispatch(0, TEST_MESSAGE)
+        testMessage = Message.Message(
+            'TEST_MESSAGE_TYPE',
+            dest=TestClass.layerA.GetId(),
+            data='TEST_DATA',
+            prop=Message.PROP_ALL)
+
+        TestClass.layerA.AddMessage(0, testMessage)
+        TestClass.layerA.Process(0)
 
         # Both C and D will forward the message to M.
         assert(_TestLayerWithHandler.calls == ['0', '0.0', '0.1', '0.1.0', '0.1.1', '0.1.1'])
 
-        #assert(False)
+    def test_Notification_Scheduling(self):
+        testMessage = Message.Message(
+            'TEST_MESSAGE_ALT_TYPE',
+            dest=TestClass.layerY.GetId(),
+            data='TEST_DATA',
+            prop=Message.PROP_EXACT)
+
+        _TestLayerWithHandler.calls = []
+
+        TestClass.layerY.ScheduleMessage(0, testMessage)
+        TestClass.layerA.Process(0)
+
+        # Notifications don't trigger handlers except at the destination.
+        assert(_TestLayerWithHandler.calls == ['0.1.2.TestID'])

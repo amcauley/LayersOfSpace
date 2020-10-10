@@ -39,3 +39,9 @@ class Scheduler:
                 If no events are present, return None.
         '''
         return self.schedule.Pop()
+
+    def Get(self, ts):
+        '''
+            Return the event queue for time ts if it exists, else None.
+        '''
+        return self.schedule.Get(ts)

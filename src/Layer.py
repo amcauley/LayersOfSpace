@@ -20,7 +20,9 @@ class Layer:
         self.scheduler = Scheduler.Scheduler()
 
         # Map message type -> handlers this layer will use for its own processing.
-        self.handlers = {}
+        self.handlers = {
+            Message.TYPE_NOTIFICATION: [self.OnNotification]
+        }
 
         # Map message type -> sub layers registered to process them.
         self.registrations = {}
@@ -34,26 +36,49 @@ class Layer:
     def SetId(self, id):
         self.id = id
 
+    def OnNotification(self):
+        pass
+
     def AddMessage(self, ts, message):
         '''
-            Add a message into the scheduler at the provided timestamp (ts).
+            Simple message adding routine.
+                Use ScheduleMessage if you want the proper upper/lower layers to schedule notifications.
         '''
         self.scheduler.Add(ts, message)
 
-    def AddMessageToItem(self, ts, message, id):
+    def ScheduleMessage(self, ts, message):
         '''
-            Send a message to a specific Item (specified by id), either higher or lower than the current layer.
+            Add a message into the scheduler at the provided timestamp (ts),
+                then register notification triggers with parents if not already registered.
         '''
-        pass
+        type = message.GetType()
 
-    def AddMessageToItemRelative(self, ts, message, delta):
-        '''
-            Send a message to 1+ Items above (or below) this one.
-                The delta specifies how many Layers to traverse before adding the item.
-                Positive = sub layers, Negative = parents.
-                If multiple sub/parent layers exist, the message will be added to all of them.
-        '''
-        pass
+        # Notifications should be scheduled in the current layer directly
+        dest = message.GetDest()
+
+        Log.debug(f'Layer {self} scheduling {type} w/dest {dest}')
+
+        if (type == Message.TYPE_NOTIFICATION) or (dest == self.id):
+            e = self.scheduler.Get(ts)
+            self.AddMessage(ts, message)
+
+            # Create a notification to higher layers that can trigger processing in this layer at the appropriate time.
+            # If events were already scheduled for the target ts, assume this has already been done previously.
+            if not e:
+                notification = Message.Notification(self.id)
+
+                for parent in self.parents:
+                    parent.ScheduleMessage(ts, notification)
+
+        elif message.DestIsSubLayerOrEqualTo(self):
+            # Pass the message down to sublayers on the path to its destination.
+            for registration in self.registrations[Message.TYPE_NOTIFICATION]:
+                if message.DestIsSubLayerOrEqualTo(registration):
+                    registration.ScheduleMessage(ts, message)
+
+        else:
+            for parent in self.parents:
+                parent.ScheduleMessage(ts, message)
 
     def AddParent(self, parentLayer):
         if parentLayer not in self.parents:
@@ -93,7 +118,7 @@ class Layer:
 
     def RegisterSubLayer(self, subLayer):
         '''
-            (Re-)Register a sub-layer, i.e. identify which message types it will handle.
+            (Re-)Register a sub-layer, i.e. identify which message types it can handle.
                 Return the name if the registered SubLayer.
                 Return None if registration failed.
         '''
@@ -109,7 +134,7 @@ class Layer:
             typeRegistrations = self.registrations.setdefault(type, [])
             if subLayer not in typeRegistrations:
                 typeRegistrations.append(subLayer)
-                Log.debug(f'Layer {self} registered message type {type} due to subLayer {subLayer}')    
+                Log.debug(f'Layer {self} registered message type {type} to subLayer {subLayer}')    
 
         newTypes = subTypes - types
 
@@ -125,26 +150,30 @@ class Layer:
         '''
             Process the message within this layer if it has a handler.
         '''
-        handler = self.handlers.get(message.getType())
+        handler = self.handlers.get(message.GetType())
         if handler:
             handler(message)
 
-    def DispatchToLowerLayers(self, ts, message):
+    def NotifyLowerLayers(self, ts, message):
         '''
-            Dispatch a message to any lower layers that have registered for it.
+            Process notifications to trigger lower layers if they're viable destinations.
         '''
-        layers = self.registrations.get(message.getType(), [])
+        layers = self.registrations.get(Message.TYPE_NOTIFICATION)
         for layer in layers:
-            layer.Dispatch(ts, message)
+            if message.DestIsSubLayerOrEqualTo(layer):
+                layer.Process(ts)
 
     def Process(self, ts):
         '''
             Process the message queue.
+
             Either hand it off to the appropriate handler or pass it on to the appropriate upper/lower layer.
         '''
         # Grab a reference for the scheduler's queue, but don't pop it until the end.
         # While processing messages, some new messages may be generated and need queueing.
         qTs, q = self.scheduler.Peek()
+
+        Log.debug(f'Processing Layer {self}: {len(q)} queued message(s)')
 
         if ts != qTs:
             return None
@@ -152,19 +181,27 @@ class Layer:
         # While there are messages to handle, run the current layer handling and then pass it down to any lower layers.
         while q:
             m = q.pop()
-            self.HandleMessage(m)
-            self.DispatchToLowerLayers(ts, m)
+
+            type = m.GetType()
+            if type == Message.TYPE_NOTIFICATION:
+                self.NotifyLowerLayers(ts, m)
+
+            elif m.dest == self.id:
+                if m.PropTargetsEqual():
+                    self.HandleMessage(m)
+
+                if m.PropTargetsLower():
+                    for subLayer in self.registrations.get(type, []):
+                        subLayer.AddMessage(ts, m.LowerEqCopy(newDest=subLayer.GetId()))
+                        subLayer.Process(ts)
+
+                if m.PropTargetsHigher():
+                    for parent in self.parents:
+                        parent.AddMessage(ts, m.HigherEqCopy(newDest=parent.GetId()))
+                        parent.Process(ts)
 
         # The queue for this ts is now empty. Pop it to remove it from the scheduler.
         self.scheduler.Pop()
-
-    def Dispatch(self, ts, message):
-        '''
-            Add a new message into the queue and process the entire queue.
-        '''
-        Log.debug(f'{self} dispatching {message} @ {ts}')
-        self.AddMessage(ts, message)
-        self.Process(ts)
 
     def __str__(self):
         return f'{self.id}'

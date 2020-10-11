@@ -40,6 +40,7 @@ class TestClass():
         #         |  \
         #         v   v
         #  D(0.1.0) -> M(0.1.1)
+
         TestClass.layerA = _TestLayerWithHandler()
         TestClass.layerB = _TestLayerWithHandler()
         TestClass.layerC = _TestLayerWithHandler()
@@ -72,7 +73,7 @@ class TestClass():
         # Both C and D will forward the message to M.
         assert(_TestLayerWithHandler.calls == ['0', '0.0', '0.1', '0.1.0', '0.1.1', '0.1.1'])
 
-    def test_Notification_Scheduling(self):
+    def test_Scheduling_Notification(self):
         testMessage = Message.Message(
             'TEST_MESSAGE_ALT_TYPE',
             dest=TestClass.layerY.GetId(),
@@ -86,3 +87,20 @@ class TestClass():
 
         # Notifications don't trigger handlers except at the destination.
         assert(_TestLayerWithHandler.calls == ['0.1.2.TestID'])
+
+    def test_Processing_Uncle(self):
+        '''
+            Check if the parent's parent's child (i.e. the "uncle") has processing routed to it.
+        '''
+        testMessage = Message.Message(
+            'TEST_MESSAGE_TYPE',
+            dest=TestClass.layerB.GetId(),
+            data='TEST_DATA',
+            prop=Message.PROP_EXACT)
+
+        _TestLayerWithHandler.calls = []
+
+        TestClass.layerD.ScheduleMessageFor(0, testMessage)
+        TestClass.layerA.Process(0)
+
+        assert(_TestLayerWithHandler.calls == ['0.0'])

@@ -44,19 +44,23 @@ class Layer:
             Simple message adding routine.
                 Use ScheduleMessage if you want the proper upper/lower layers to schedule notifications.
         '''
+        Log.debug(f'Layer {self} added {message.GetType()} w/dest {message.GetDest()}')
         self.scheduler.Add(ts, message)
 
     def ScheduleMessage(self, ts, message):
         '''
             Add a message into the scheduler at the provided timestamp (ts),
                 then register notification triggers with parents if not already registered.
+
+            It's expected that the destination is the current layer or a sublayer.
+
+            If you want to schedule on behalf of another layer, including higher ones or ones in parallel braches,
+                use ScheduleMessageFor(...).   
         '''
         type = message.GetType()
 
         # Notifications should be scheduled in the current layer directly
         dest = message.GetDest()
-
-        Log.debug(f'Layer {self} scheduling {type} w/dest {dest}')
 
         if (type == Message.TYPE_NOTIFICATION) or (dest == self.id):
             e = self.scheduler.Get(ts)
@@ -72,13 +76,40 @@ class Layer:
 
         elif message.DestIsSubLayerOrEqualTo(self):
             # Pass the message down to sublayers on the path to its destination.
-            for registration in self.registrations[Message.TYPE_NOTIFICATION]:
-                if message.DestIsSubLayerOrEqualTo(registration):
-                    registration.ScheduleMessage(ts, message)
+            for subLayer in self.GetSubLayers():
+                if message.DestIsSubLayerOrEqualTo(subLayer):
+                    subLayer.ScheduleMessage(ts, message)
 
         else:
             for parent in self.parents:
                 parent.ScheduleMessage(ts, message)
+
+    def ScheduleMessageFor(self, ts, message):
+        '''
+            Schedule a message on behalf of the destination layer.
+                Return True if successful.
+        '''
+        # Navigate to the proper destination then run normal scheduling.
+        dest = message.GetDest()
+
+        Log.debug(f'Layer {self} scheduling {message.GetType()} for {dest}')
+
+        if dest == self.id:
+            self.ScheduleMessage(ts, message)
+            return True
+
+        elif message.DestIsSubLayerOrEqualTo(self):
+            for subLayer in self.GetSubLayers():
+                if message.DestIsSubLayerOrEqualTo(subLayer):
+                    if subLayer.ScheduleMessageFor(ts, message):
+                        return True
+            return False
+
+        else:
+            for parent in self.parents:
+                if parent.ScheduleMessageFor(ts, message):
+                    return True
+            return False
 
     def AddParent(self, parentLayer):
         if parentLayer not in self.parents:
@@ -115,6 +146,10 @@ class Layer:
             childId = existingId
 
         return childId
+
+    def GetSubLayers(self):
+        # All layers are expected to register for notifications.
+        return self.registrations.get(Message.TYPE_NOTIFICATION, [])
 
     def RegisterSubLayer(self, subLayer):
         '''
@@ -158,7 +193,7 @@ class Layer:
         '''
             Process notifications to trigger lower layers if they're viable destinations.
         '''
-        layers = self.registrations.get(Message.TYPE_NOTIFICATION)
+        layers = self.GetSubLayers()
         for layer in layers:
             if message.DestIsSubLayerOrEqualTo(layer):
                 layer.Process(ts)

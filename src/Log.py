@@ -11,9 +11,9 @@ class _Log:
     def __init__(self):
         self.logger = logging.getLogger()
         self.logger.setLevel(logging.DEBUG)
-        #self.handler = logging.StreamHandler(sys.stdout)
-        #self.handler.setLevel(logging.DEBUG)
-        #self.logger.addHandler(self.handler)
+        self.handler = logging.StreamHandler(sys.stdout)
+        self.handler.setLevel(logging.DEBUG)
+        self.logger.addHandler(self.handler)
 
         self.debug('Initialized logger')
 

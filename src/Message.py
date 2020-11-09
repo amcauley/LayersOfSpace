@@ -39,8 +39,14 @@ class Message:
     def GetSrc(self):
         return self.src
 
+    def SetSrc(self, src):
+        self.src = src
+
     def GetData(self):
         return self.data
+
+    def SetData(self, data):
+        self.data = data
 
     def DestIsSubLayerOrEqualTo(self, ref):
         return self.dest.startswith(ref.GetId())

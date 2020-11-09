@@ -206,7 +206,12 @@ class Layer:
         '''
         # Grab a reference for the scheduler's queue, but don't pop it until the end.
         # While processing messages, some new messages may be generated and need queueing.
-        qTs, q = self.scheduler.Peek()
+        s = self.scheduler.Peek()
+        if not s:
+            Log.debug(f'No queued messages for Layer {self}')
+            return None
+
+        qTs, q = s
 
         Log.debug(f'Processing Layer {self}: {len(q)} queued message(s)')
 

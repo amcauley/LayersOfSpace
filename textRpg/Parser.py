@@ -81,7 +81,7 @@ class Controller:
 
     def reset(self):
         ''' Clear state. '''
-            # Structure storing prompt parsing info.
+        # Structure storing prompt parsing info.
         # {
         #   'info': {
         #       'name': Situation/Prompt name
@@ -175,6 +175,7 @@ class Controller:
             print(f'Unexpected input "{input}"')
 
 if __name__ == '__main__':
+    # Quick demo based on Test.txt. Not yet interactive - input(s) are hardcoded.
     controller = Controller()
     dUser = getDefaultUserDict()
 

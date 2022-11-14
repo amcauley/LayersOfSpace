@@ -9,3 +9,7 @@ OPT Test2.txt:Fourth Go to 4th
 SIT Second
 TXT Second test situation
 OPT First Go to 1st
+
+SIT Third
+TXT Third test situation
+OPT First Go to 1st

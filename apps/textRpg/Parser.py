@@ -133,7 +133,7 @@ class Controller:
         '''
         self.resetPrompt()
         self.dPrompt['state']['path'] = option
-        print(f'getPrompt for "{option}"')
+        #print(f'getPrompt for "{option}"')
 
         split = option.split(':')
         filePath = ':'.join(split[:-1])
@@ -152,8 +152,9 @@ class Controller:
                     continue
 
                 handler = CMD_HANDLERS.get(cmdType)
+
+                # The following will trigger for the first blank line after a block, ex. at the end of a SIT block.
                 if handler is None:
-                    print(f'No handler found for cmd "{cmdType}"')
                     bTargetBlock = False
                     continue
 
@@ -175,12 +176,14 @@ class Controller:
             print(f'Unexpected input "{input}"')
 
 if __name__ == '__main__':
-    # Quick demo based on Test.txt. Not yet interactive - input(s) are hardcoded.
+    # Quick demo based on Test.txt.
+    # To run: "python Parser.py" from the containing directory.
     controller = Controller()
     dUser = getDefaultUserDict()
 
-    controller.getPrompt('Test.txt:First', dUser)
+    controller.getPrompt('Configs/Test.txt:First', dUser)
+    # TODO: Display user options
     print(dUser)
 
-    controller.getResponse('1', dUser)
+    controller.getResponse('3', dUser)
     print(dUser)

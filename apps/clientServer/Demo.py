@@ -1,9 +1,43 @@
+'''
+This demo shows an implementation of a separated client and target, i.e. the client UI and backend server/target are
+separate entities. This is similar to the situation where the client and server could be on separate machines.
+
+To Run: "python -m LayersOfSpace.apps.clientServer.Demo"
+
+There are drawbacks to this design for a real prompt/response application, namely latency in synchronizing components.
+For a more responsive text-based prompt/response example, see the textRpg folder.
+
+The following diagram shows the processing loop used in the demo:
+
+Client                                         Target
+
+show prompt   <--------------------------------------
+|                                                   |
+V                                                   |
+prompt response                                     |
+|                                                   |
+V                                                   |
+qToUser                                             |
+|                                                   |
+V                                                   |
+user input                                          |
+|                                                   |
+V                                                   |
+MOVEMENT                                            |
+|                                                   |
+V                wakeup timer                       |
+qFromUser ------------------------> HandleMovement  |
+                                            |       |
+                                            V       |
+                                        next PROMPT_DATA
+'''
+
 from queue import Queue
 from threading import Thread
 import time
 
-from ..src import Layer, Message
-from ..src.Log import Log
+from ...src import Layer, Message
+from ...src.Log import Log
 
 PROMPT_DATA = {
     'bResponse': True,
